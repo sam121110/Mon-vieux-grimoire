@@ -1,14 +1,17 @@
 const express = require('express');
 const app = express();
-app.use(express.json());
 const mongoose = require('mongoose');
 const userRoutes = require('./routes/user');
+require('dotenv').config();
 
-mongoose.connect('mongodb+srv://sam121110987654321:<password>@cluster16.vssydqk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster16',
+const password = process.env.MONGODB_PASSWORD;
+
+mongoose.connect(`mongodb+srv://sam121110987654321:${password}@cluster16.vssydqk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster16`,
   { useNewUrlParser: true,
     useUnifiedTopology: true })
   .then(() => console.log('Connexion à MongoDB réussie !'))
   .catch(() => console.log('Connexion à MongoDB échouée !'));
+  
 
 app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,8 +20,16 @@ app.use((req, res, next) => {
     next();
   });
 
+app.use(express.json());
 
-app.use('/', (req, res, next) => {
+app.post('/api/books', (req, res, next) => {
+  console.log(req.body);
+  res.status(201).json({
+    message: 'Objet créé !'
+  });
+});
+
+app.use('/api/books', (req, res, next) => {
     const books = [{
         "id": "1",
         "userId" : "clc4wj5lh3gyi0ak4eq4n8syr",
@@ -256,6 +267,7 @@ app.use('/', (req, res, next) => {
       ]
     res.status(200).json(books);
   });
+
 
 app.use('/api/auth', userRoutes);
 
