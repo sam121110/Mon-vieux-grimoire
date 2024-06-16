@@ -40,12 +40,30 @@ exports.createBook = (req, res, next) => {
 
 // modification d'un livre
 exports.updateBook = (req, res, next) => {
-    const book = { ...req.body, _id: req.params.id };
-    if (req.file) {
-        book.imageUrl = `${req.protocol}://${req.get('host')}/images/${req.file.filename}`;
-    }
-    Book.updateOne({ _id: req.params.id }, book)
-        .then(() => res.status(200).json({ message: 'Objet modifié !' }))
+    Book.findOne({ _id: req.params.id })
+        .then(book => {
+            if (book.userId != req.auth.userId) {
+                return res.status(401).json({ message: 'Not authorized' });
+            }
+
+            const bookObject = req.file ?
+            {
+                ...JSON.parse(req.body.book),
+                imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
+            } : { ...req.body };
+
+            if (req.file) {
+                // Supprimer l'ancienne image si une nouvelle est téléchargée
+                const oldFilename = book.imageUrl.split('/images/')[1];
+                fs.unlink(`images/${oldFilename}`, (err) => {
+                    if (err) console.log(err);
+                });
+            }
+
+            Book.updateOne({ _id: req.params.id }, { ...bookObject, _id: req.params.id })
+                .then(() => res.status(200).json({ message: 'Objet modifié !' }))
+                .catch(error => res.status(400).json({ error }));
+        })
         .catch(error => res.status(400).json({ error }));
 };
 
