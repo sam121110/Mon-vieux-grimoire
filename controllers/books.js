@@ -1,5 +1,6 @@
 const Book = require('../models/book');
 const fs = require('fs');
+const sharp = require('sharp');
 
 // afficher tous les livres
 exports.getAllBooks = (req, res, next) => {
@@ -22,21 +23,33 @@ exports.getOneBook = (req, res, next) => {
 };
 
 // enregistrer un nouveau livre
-
 exports.createBook = (req, res, next) => {
     const bookObject = JSON.parse(req.body.book);
     delete bookObject._id;
     delete bookObject._userId;
     const book = new Book({
         ...bookObject,
-        userId: req.auth.userId,
-        imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
+        userId: req.auth.userId
     });
-  
-    book.save()
-    .then(() => { res.status(201).json({message: 'Objet enregistré !'})})
-    .catch(error => { res.status(400).json( { error })})
- };
+
+    const filename = `${req.file.filename.split('.')[0]}.webp`;
+    const outputFilePath = `images/${filename}`;
+
+    sharp(req.file.path)
+        .resize(500) 
+        .toFormat('webp')
+        .toFile(outputFilePath, (err, info) => {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+
+            book.imageUrl = `${req.protocol}://${req.get('host')}/images/${filename}`;
+
+            book.save()
+                .then(() => { res.status(201).json({ message: 'Objet enregistré !' }) })
+                .catch(error => { res.status(400).json({ error }) });
+        });
+};
 
 // modification d'un livre
 exports.updateBook = (req, res, next) => {
@@ -49,7 +62,7 @@ exports.updateBook = (req, res, next) => {
             const bookObject = req.file ?
             {
                 ...JSON.parse(req.body.book),
-                imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
+                imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename.split('.')[0]}.webp`
             } : { ...req.body };
 
             if (req.file) {
@@ -58,31 +71,49 @@ exports.updateBook = (req, res, next) => {
                 fs.unlink(`images/${oldFilename}`, (err) => {
                     if (err) console.log(err);
                 });
-            }
 
-            Book.updateOne({ _id: req.params.id }, { ...bookObject, _id: req.params.id })
-                .then(() => res.status(200).json({ message: 'Objet modifié !' }))
-                .catch(error => res.status(400).json({ error }));
+                const filename = `${req.file.filename.split('.')[0]}.webp`;
+                const outputFilePath = `images/${filename}`;
+
+                sharp(req.file.path)
+                    .resize(500) 
+                    .toFormat('webp')
+                    .toFile(outputFilePath, (err, info) => {
+                        if (err) {
+                            return res.status(500).json({ error: err.message });
+                        }
+
+                        bookObject.imageUrl = `${req.protocol}://${req.get('host')}/images/${filename}`;
+
+                        Book.updateOne({ _id: req.params.id }, { ...bookObject, _id: req.params.id })
+                            .then(() => res.status(200).json({ message: 'Objet modifié !' }))
+                            .catch(error => res.status(400).json({ error }));
+                    });
+            } else {
+                Book.updateOne({ _id: req.params.id }, { ...bookObject, _id: req.params.id })
+                    .then(() => res.status(200).json({ message: 'Objet modifié !' }))
+                    .catch(error => res.status(400).json({ error }));
+            }
         })
         .catch(error => res.status(400).json({ error }));
 };
 
 // suppression d'un livre
 exports.deleteBook = (req, res, next) => {
-    Book.findOne({ _id: req.params.id})
+    Book.findOne({ _id: req.params.id })
         .then(book => {
             if (book.userId != req.auth.userId) {
-                res.status(401).json({message: 'Not authorized'});
+                res.status(401).json({ message: 'Not authorized' });
             } else {
                 const filename = book.imageUrl.split('/images/')[1];
                 fs.unlink(`images/${filename}`, () => {
-                    Book.deleteOne({_id: req.params.id})
-                        .then(() => { res.status(200).json({message: 'Objet supprimé !'})})
+                    Book.deleteOne({ _id: req.params.id })
+                        .then(() => { res.status(200).json({ message: 'Objet supprimé !' }) })
                         .catch(error => res.status(401).json({ error }));
                 });
             }
         })
-        .catch( error => {
+        .catch(error => {
             res.status(500).json({ error });
         });
- };
+};
