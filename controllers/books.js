@@ -9,9 +9,7 @@ exports.getAllBooks = (req, res, next) => {
             res.status(200).json(books);
         })
         .catch(error => {
-            res.status(500).json({
-                message: 'Fetching books failed!'
-            });
+            res.status(500).json({ message: 'Fetching books failed!' });
         });
 };
 
@@ -27,6 +25,7 @@ exports.createBook = (req, res, next) => {
     const bookObject = JSON.parse(req.body.book);
     delete bookObject._id;
     delete bookObject._userId;
+
     const book = new Book({
         ...bookObject,
         userId: req.auth.userId
@@ -36,7 +35,7 @@ exports.createBook = (req, res, next) => {
     const outputFilePath = `images/${filename}`;
 
     sharp(req.file.path)
-        .resize(500) 
+        .resize({ width: 250, height: 250 }) 
         .toFormat('webp')
         .toFile(outputFilePath, (err, info) => {
             if (err) {
@@ -46,8 +45,8 @@ exports.createBook = (req, res, next) => {
             book.imageUrl = `${req.protocol}://${req.get('host')}/images/${filename}`;
 
             book.save()
-                .then(() => { res.status(201).json({ message: 'Objet enregistré !' }) })
-                .catch(error => { res.status(400).json({ error }) });
+                .then(() => res.status(201).json({ message: 'Objet enregistré !' }))
+                .catch(error => res.status(400).json({ error }));
         });
 };
 
@@ -76,7 +75,7 @@ exports.updateBook = (req, res, next) => {
                 const outputFilePath = `images/${filename}`;
 
                 sharp(req.file.path)
-                    .resize(500) 
+                    .resize({ width: 250, height: 250 }) 
                     .toFormat('webp')
                     .toFile(outputFilePath, (err, info) => {
                         if (err) {
@@ -108,12 +107,49 @@ exports.deleteBook = (req, res, next) => {
                 const filename = book.imageUrl.split('/images/')[1];
                 fs.unlink(`images/${filename}`, () => {
                     Book.deleteOne({ _id: req.params.id })
-                        .then(() => { res.status(200).json({ message: 'Objet supprimé !' }) })
+                        .then(() => res.status(200).json({ message: 'Objet supprimé !' }))
                         .catch(error => res.status(401).json({ error }));
                 });
             }
         })
-        .catch(error => {
-            res.status(500).json({ error });
-        });
+        .catch(error => res.status(500).json({ error }));
+};
+
+// Ajouter une notation à un livre
+exports.addRating = (req, res, next) => {
+    Book.findOne({ _id: req.params.id })
+        .then(book => {
+            if (!book) {
+                return res.status(404).json({ message: 'Book not found!' });
+            }
+
+            const userId = req.auth.userId;
+            const rating = req.body.rating;
+
+            // Vérifier si l'utilisateur a déjà noté ce livre
+            const existingRating = book.ratings.find(r => r.userId === userId);
+            if (existingRating) {
+                return res.status(400).json({ message: 'You have already rated this book!' });
+            }
+
+            // Ajouter la nouvelle notation
+            book.ratings.push({ userId, rating });
+
+            // Calculer la nouvelle moyenne des notes
+            const totalRatings = book.ratings.reduce((acc, r) => acc + r.rating, 0);
+            book.averageRating = totalRatings / book.ratings.length;
+
+            // Sauvegarder le livre avec la nouvelle notation
+            book.save()
+                .then(() => res.status(200).json({ message: 'Rating added successfully!' }))
+                .catch(error => res.status(400).json({ error }));
+        })
+        .catch(error => res.status(500).json({ error }));
+};
+
+// Obtenir les 3 livres avec la meilleure note moyenne
+exports.getBestRatedBooks = (req, res, next) => {
+    Book.find().sort({ averageRating: -1 }).limit(3)
+        .then(books => res.status(200).json(books))
+        .catch(error => res.status(500).json({ error }));
 };
