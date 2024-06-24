@@ -102,7 +102,7 @@ exports.deleteBook = (req, res, next) => {
     Book.findOne({ _id: req.params.id })
         .then(book => {
             if (book.userId != req.auth.userId) {
-                res.status(401).json({ message: 'Not authorized' });
+                res.status(401).json({ message: 'Non autorisé!' });
             } else {
                 const filename = book.imageUrl.split('/images/')[1];
                 fs.unlink(`images/${filename}`, () => {
@@ -120,7 +120,7 @@ exports.addRating = (req, res, next) => {
     Book.findOne({ _id: req.params.id })
         .then(book => {
             if (!book) {
-                return res.status(404).json({ message: 'Book not found!' });
+                return res.status(404).json({ message: 'Livre non trouvé!' });
             }
 
             const userId = req.auth.userId;
@@ -129,7 +129,7 @@ exports.addRating = (req, res, next) => {
             // Vérifier si l'utilisateur a déjà noté ce livre
             const existingRating = book.ratings.find(r => r.userId === userId);
             if (existingRating) {
-                return res.status(400).json({ message: 'You have already rated this book!' });
+                return res.status(400).json({ message: 'Livre déjà noté!' });
             }
 
             // Ajouter la nouvelle notation
@@ -141,7 +141,7 @@ exports.addRating = (req, res, next) => {
 
             // Sauvegarder le livre avec la nouvelle notation
             book.save()
-                .then(() => res.status(200).json({ message: 'Rating added successfully!' }))
+                .then(() => res.status(200).json({ message: 'Note ajoutée avec succès!' }))
                 .catch(error => res.status(400).json({ error }));
         })
         .catch(error => res.status(500).json({ error }));
@@ -150,6 +150,9 @@ exports.addRating = (req, res, next) => {
 // Obtenir les 3 livres avec la meilleure note moyenne
 exports.getBestRatedBooks = (req, res, next) => {
     Book.find().sort({ averageRating: -1 }).limit(3)
-        .then(books => res.status(200).json(books))
+        .then(books => {
+            res.status(200).json(books);
+        })
         .catch(error => res.status(500).json({ error }));
 };
+
