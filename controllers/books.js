@@ -41,6 +41,10 @@ exports.createBook = (req, res, next) => {
             if (err) {
                 return res.status(500).json({ error: err.message });
             }
+            //Suppression du fichier original
+            fs.unlink(req.file.path, (unlinkErr) => {
+                if (unlinkErr) console.log(unlinkErr);
+            });
 
             book.imageUrl = `${req.protocol}://${req.get('host')}/images/${filename}`;
 
@@ -81,6 +85,11 @@ exports.updateBook = (req, res, next) => {
                         if (err) {
                             return res.status(500).json({ error: err.message });
                         }
+
+                        // Suppression du fichier original
+                        fs.unlink(req.file.path, (unlinkErr) => {
+                            if (unlinkErr) console.log(unlinkErr);
+                        });
 
                         bookObject.imageUrl = `${req.protocol}://${req.get('host')}/images/${filename}`;
 
